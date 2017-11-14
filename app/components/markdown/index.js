@@ -1,9 +1,10 @@
 // Copyright (c) 2017-present Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-import {Parser} from 'commonmark';
+import {Parser, Node} from 'commonmark';
 import Renderer from 'commonmark-react-renderer';
 import React, {PureComponent} from 'react';
+import {intlShape} from 'react-intl';
 import PropTypes from 'prop-types';
 import {
     Platform,
@@ -30,6 +31,8 @@ export default class Markdown extends PureComponent {
         blockStyles: PropTypes.object,
         emojiSizes: PropTypes.object,
         fontSizes: PropTypes.object,
+        intl: intlShape.isRequired,
+        isEdited: PropTypes.bool,
         isSearchResult: PropTypes.bool,
         navigator: PropTypes.object.isRequired,
         onLongPress: PropTypes.func,
@@ -110,7 +113,9 @@ export default class Markdown extends PureComponent {
                 softBreak: this.renderSoftBreak,
 
                 htmlBlock: this.renderHtml,
-                htmlInline: this.renderHtml
+                htmlInline: this.renderHtml,
+
+                editedIndicator: this.renderEditedIndicator
             },
             renderParagraphsInLists: true
         });
@@ -303,8 +308,28 @@ export default class Markdown extends PureComponent {
         );
     }
 
+    renderEditedIndicator = ({context}) => {
+        let message = '';
+        let opacity = Platform.select({ios: 0.7, android: 1});
+        if (context[0] === 'paragraph') {
+            message = ' ';
+            opacity = Platform.select({ios: 0.5, android: 0.6});
+        }
+        message += this.props.intl.formatMessage({id: 'post_message_view.edited', defaultMessage: '(edited)'});
+        return <Text style={[style.editedIndicatorText, {opacity}]}>{message}</Text>;
+    }
+
     render() {
         const ast = this.parser.parse(this.props.value);
+
+        if (this.props.isEdited) {
+            const editIndicatorNode = new Node('edited_indicator');
+            if (['code_block', 'thematic_break', 'block_quote'].includes(ast.lastChild.type)) {
+                ast.appendChild(editIndicatorNode);
+            } else {
+                ast.lastChild.appendChild(editIndicatorNode);
+            }
+        }
 
         return <View>{this.renderer.render(ast)}</View>;
     }
@@ -315,5 +340,8 @@ const style = StyleSheet.create({
         alignItems: 'flex-start',
         flexDirection: 'row',
         flexWrap: 'wrap'
+    },
+    editedIndicatorText: {
+        fontSize: 14
     }
 });
